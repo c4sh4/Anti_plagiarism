@@ -5,20 +5,18 @@ import token
 import dis
 import argparse
 import time
-import pandas as pd
 
 
 def input_txt(input_path):
-    """ Open  file with a list of pairs of documents."""
-    # 'input.txt' r'C:\Users\Admin\Desktop\Tinkoff_edu\test.txt '
+    """ Open file with a list of pairs of documents."""
     with open(str(input_path), 'r', encoding='utf-8') as input_file:
         in_path = input_file.read().split()
-    return in_path[:20]
+    return in_path[:10]
 
 
-def get_file(source):
+def get_file(source_):
     """ Get py file from link."""
-    with open(str(source), 'r', encoding='utf-8') as py_file:
+    with open(str(source_), 'r', encoding='utf-8') as py_file:
         py_file = py_file.read()
     return py_file
 
@@ -31,9 +29,8 @@ def lexeme_selection(file):
     for t_type, t_str, (srow, scol), (erow, ecol), pos_str in tokenize.generate_tokens(rl_):
         tokens_name.append(token.tok_name[t_type])
         lexeme.append(t_str)
-    temp_dict = {'token': tokens_name, 'lexeme': lexeme}
-    lexeme_df = pd.DataFrame(temp_dict)
-    return lexeme_df
+    tok_dict = {'token': tokens_name, 'lexeme': lexeme}
+    return tok_dict
 
 
 def bytecode_selection(file):
@@ -47,7 +44,7 @@ def bytecode_selection(file):
     else:
         for instr in file_dis:
             instr_list.append(instr.opname)
-        return instr_list
+    return instr_list
 
 
 def longest_common_subsequence(sel1, sel2):
@@ -104,86 +101,78 @@ def code_similarity(f_list):
     Otherwise, lcs set to the values of based metric.
     """
     p = 0
-    dl_list = []  # Damerau Levenshtein distance
-    lcs_list = []  # lcs distance
+    dl_ = 0
+    lcs_ = 0
     while p < len(f_list) - 1:
         dl_d = damerau_levenshtein(f_list[p], f_list[p + 1])
-        dl_list.append(round(1 - (dl_d / len(f_list[p])), 3))
-        if round(1 - (dl_d / len(f_list[p])), 3) < 0.30:
+        dl_ = (round(1 - (dl_d / len(f_list[p])), 3))
+        if 0.15 <= round(1 - (dl_d / len(f_list[p])), 3) < 0.60:
             lcs = longest_common_subsequence(f_list[p], f_list[p + 1])
-            lcs_list.append(round(lcs / len(f_list[p]), 3))
+            lcs_ = (round(lcs / len(f_list[p]), 3))
         else:
-            lcs_list.append(round(1 - (dl_d / len(f_list[p])), 3))
+            lcs_ = (round(1 - (dl_d / len(f_list[p])), 3))
         p += 2
-    temporary_dict = {'dl': dl_list, 'lcs': lcs_list}
-    code_sim_df = pd.DataFrame(temporary_dict)
+    code_sim_df = [dl_, lcs_]
     return code_sim_df
 
 
 def token_column(lex_list):
     """ Create a column for the final dataframe with token based distance."""
-    token_list = []
-    for tok in enumerate(lex_list):
-        token_list.append(list(lex_list[tok[0]]['token']))
+    token_list = [list(lex_list[0]['token']), list(lex_list[1]['token'])]
     return code_similarity(token_list)
 
 
 def lexeme_column(lex_list):
     """ Create a column for the final dataframe with py lexeme based distance."""
-    s_lex_list = []
-    for lexeme in enumerate(lex_list):
-        lex_list[lexeme[0]] = lex_list[lexeme[0]][lex_list[lexeme[0]]['token'] != 'STRING']
-    for lex_ in enumerate(lex_list):
-        s_lex_list.append(list(lex_list[lex_[0]]['lexeme']))
-    return code_similarity(s_lex_list)
+    s_lex_list1 = []
+    s_lex_list2 = []
+    pair_lex_list = []
+    for lexeme in enumerate(lex_list[0]['token']):
+        if lex_list[0]['token'][lexeme[0]] != 'STRING':
+            s_lex_list1.append(lex_list[0]['lexeme'][lexeme[0]])
+    for lexeme in enumerate(lex_list[1]['token']):
+        if lex_list[1]['token'][lexeme[0]] != 'STRING':
+            s_lex_list2.append(lex_list[1]['lexeme'][lexeme[0]])
+    pair_lex_list.append(list(s_lex_list1))
+    pair_lex_list.append(list(s_lex_list2))
+    return code_similarity(pair_lex_list)
 
 
-def get_scores(f_list, pair_list):
-    """ Scoring representations of a pair of files in the form of byte code, tokens and program text.
+def get_scores(f_list):
+    """ Scoring representations of a pair of files in the form of byte code,
+    tokens and program text.
     Scoring is based on the Damerau Levenshtein distance and the largest common subsequence.
     """
     lexeme_list = []
     bytecode_list = []
+    sim_list = []
+
     for fc in f_list:
         lexeme_list.append(lexeme_selection(fc))
         bytecode_list.append(bytecode_selection(fc))
-    df = pd.DataFrame(pair_list)
-    df = df.join(code_similarity(bytecode_list))
-    df = df.rename(columns={0: "f", "dl": "b_dl", "lcs": "b_lcs"})
-    df = df.join(token_column(lexeme_list))
-    df = df.rename(columns={"dl": "t_dl", "lcs": "t_lcs"})
-    df['distance'] = abs(df.b_dl - df.t_lcs)
-    # Replacement for file pairs for which binary representations were not obtained.
-    df.loc[(df['b_dl'] == 0), 'b_dl'] = df.t_dl
-    # additional test
-    doubt = additional_test(df[(df['distance'] > 0.150)], lexeme_list)
-    df['l_dl'] = df['b_dl']
-    df['l_lcs'] = df['t_lcs']
-    for ind, r in enumerate(doubt['f']):
-        df.loc[(df['f'] == r), 'l_dl'] = doubt['l_dl'][ind]
-        df.loc[(df['f'] == r), 'l_lcs'] = doubt['l_lcs'][ind]
-    df = df.drop(columns='distance')
-    res = round((df['b_dl'] + df['t_lcs'] + (df['l_dl'] + df['l_lcs'])/2) / 3, 3)
-    for r in enumerate(res):
-        res[r[0]] = res[r[0]] if res[r[0]] > 0 else 0.
-    result_list = list(res)
-    # print(df)
-    return result_list
 
+    sim_list.append(code_similarity(bytecode_list))  # b_dl, b_lcs
 
-def additional_test(df_doubt, lexeme_list):
-    """ Checking pairs of texts on which the byte code similarity check gave a doubtful result or was not passed.
-    Files are compared directly for each token, with the exclusion of comments.
-    """
-    short_lexeme_list = []
-    for f in df_doubt.f:
-        short_lexeme_list.append(lexeme_list[int(f) - 1])
-        short_lexeme_list.append(lexeme_list[int(f)])
-    df_doubt = df_doubt.reset_index()
-    df_doubt = df_doubt.join(lexeme_column(short_lexeme_list))
-    df_doubt = df_doubt.rename(columns={"dl": "l_dl", "lcs": "l_lcs"})
-    df_doubt = df_doubt.drop(columns='index')
-    return df_doubt
+    sim_list.append(token_column(lexeme_list))  # t_dl, t_lcs
+
+    distance = abs(sim_list[0][0] - sim_list[1][1])
+
+    if sim_list[0][0] == 0:
+        sim_list[0][0] = sim_list[1][1]  # b_dl = t_lcs
+    if sim_list[0][1] == 0:
+        sim_list[0][1] = sim_list[1][0]  # b_lcs = t_dl
+    if sim_list[1][0] == sim_list[1][1] == 0:
+        sim_list[1][0] = sim_list[0][0]  # t_dl = b_dl
+        sim_list[1][1] = sim_list[0][1]  # t_lcs = b_lcs
+    if distance > 0.250:
+        sim_list.append(lexeme_column(lexeme_list))
+    else:
+        sim_list.append([sim_list[0][0], sim_list[1][1]])
+    res = round(((sim_list[0][0] + sim_list[0][1]) / 2 +
+                 (sim_list[1][0] + sim_list[1][1]) / 2 +
+                 (sim_list[2][0] + sim_list[2][1]) / 2) / 3, 3)
+    res = res if res > 0 else 0.
+    return res
 
 
 def scores_file(res_list, scores_path):
@@ -206,15 +195,17 @@ def parser():
 if __name__ == "__main__":
     start = time.time()
     file_list = []
-    list_of_couples = []
+    score_list = []
     source = parser()
     path_list = input_txt(source[0])
-    # path_list = input_txt()
-    for i, path in enumerate(path_list):
-        file_list.append(get_file(path))
-        if i % 2 == 1:
-            list_of_couples.append(i)
-    score_list = get_scores(file_list, list_of_couples)
+    # path_list = input_txt('input.txt')
+    for i, path in enumerate(path_list[:-1]):
+        if i % 2 == 0:
+            pair_file = [get_file(path), get_file(path_list[i + 1])]
+            file_list.append(tuple(pair_file))
+    for iter_, pair_ in enumerate(file_list):
+        score_list.append(get_scores(pair_))
     scores_file(score_list, source[1])
-    end = time.time()-start
+    # scores_file(score_list, 'score.txt')
+    end = time.time() - start
     print('time of evaluation: ', round(end, 3))
