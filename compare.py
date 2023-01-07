@@ -193,6 +193,7 @@ def scores_file(res_list, scores_path):
 
 
 def parser():
+    """ Allows you to run compare from a terminal."""
     pars = argparse.ArgumentParser(description='')
     pars.add_argument('input', type=str, help='Input file with a list of file pairs to check.')
     pars.add_argument('scores', type=str, help='Program text similarity evaluation file.')
