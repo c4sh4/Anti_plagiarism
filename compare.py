@@ -8,12 +8,12 @@ import time
 import pandas as pd
 
 
-def input_txt(input_path='input.txt'):
+def input_txt(input_path):
     """ Open  file with a list of pairs of documents."""
     # 'input.txt' r'C:\Users\Admin\Desktop\Tinkoff_edu\test.txt '
     with open(str(input_path), 'r', encoding='utf-8') as input_file:
         in_path = input_file.read().split()
-    return in_path
+    return in_path[:20]
 
 
 def get_file(source):
@@ -163,11 +163,11 @@ def get_scores(f_list, pair_list):
         df.loc[(df['f'] == r), 'l_dl'] = doubt['l_dl'][ind]
         df.loc[(df['f'] == r), 'l_lcs'] = doubt['l_lcs'][ind]
     df = df.drop(columns='distance')
-    res = round((df['b_dl'] + df['t_lcs'] + df['l_dl'] + df['l_lcs']) / 4, 3)
+    res = round((df['b_dl'] + df['t_lcs'] + (df['l_dl'] + df['l_lcs'])/2) / 3, 3)
     for r in enumerate(res):
         res[r[0]] = res[r[0]] if res[r[0]] > 0 else 0.
     result_list = list(res)
-    print(df)
+    # print(df)
     return result_list
 
 
@@ -186,7 +186,7 @@ def additional_test(df_doubt, lexeme_list):
     return df_doubt
 
 
-def scores_file(res_list, scores_path='scores.txt'):
+def scores_file(res_list, scores_path):
     """ Fill scores.txt."""
     with open(str(scores_path), 'w', encoding='utf-8') as score:
         for res_ in res_list:
@@ -207,15 +207,14 @@ if __name__ == "__main__":
     start = time.time()
     file_list = []
     list_of_couples = []
-    # source = parser()
-    # path_list = input_txt(source[0])
-    path_list = input_txt()
+    source = parser()
+    path_list = input_txt(source[0])
+    # path_list = input_txt()
     for i, path in enumerate(path_list):
         file_list.append(get_file(path))
         if i % 2 == 1:
             list_of_couples.append(i)
     score_list = get_scores(file_list, list_of_couples)
-    # scores_file(score_list, source[1])
-    scores_file(score_list)
+    scores_file(score_list, source[1])
     end = time.time()-start
     print('time of evaluation: ', round(end, 3))
